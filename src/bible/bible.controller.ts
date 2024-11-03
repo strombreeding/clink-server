@@ -9,6 +9,7 @@ import {
   Query,
   UseInterceptors,
   UploadedFile,
+  HttpStatus,
 } from '@nestjs/common';
 import { BibleService } from './bible.service';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -20,17 +21,14 @@ import { ObjectId } from 'mongoose';
 export class BibleController {
   constructor(private readonly bibleService: BibleService) {}
 
-  @Post('new-translation')
-  @UseInterceptors(FileInterceptor('jsonFile'))
-  async create(@UploadedFile() file: Express.Multer.File) {
-    const zz = await this.bibleService.createChapter(file);
-    return zz;
-  }
-
   @Get('/have-translations')
   async getAllTranslations() {
     const translations = await this.bibleService.findAllTranslation();
-    return translations;
+    return {
+      msg: '서버가 소유한 번역본 리스트 조회',
+      data: translations,
+      status: HttpStatus.OK,
+    };
   }
 
   @Get('/chapters')
@@ -38,7 +36,11 @@ export class BibleController {
     const chapters = await this.bibleService.findAllChapters(
       query.translations,
     );
-    return chapters;
+    return {
+      msg: '챕터 조회 ',
+      data: chapters,
+      status: HttpStatus.OK,
+    };
   }
 
   @Get('/verses')
@@ -46,11 +48,17 @@ export class BibleController {
     const verses = await this.bibleService.findVersesFromChapterId(
       query.chapterId,
     );
-    return verses;
+    return {
+      msg: '절 조회',
+      status: HttpStatus.OK,
+      data: verses,
+    };
   }
 
-  @Get()
-  async getChapterAndVerses(
-    @Query() { chapterName: string, chapter: number, translation: Translation },
-  ) {}
+  @Post('/new-translation')
+  @UseInterceptors(FileInterceptor('jsonFile'))
+  async create(@UploadedFile() file: Express.Multer.File) {
+    const zz = await this.bibleService.createChapter(file);
+    return zz;
+  }
 }
