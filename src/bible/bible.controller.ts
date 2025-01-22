@@ -16,12 +16,15 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { Translation } from '../../types/enum';
 import { query } from 'express';
 import { ObjectId } from 'mongoose';
+import { ApiOperation, ApiProperty, ApiResponse } from '@nestjs/swagger';
 
 @Controller('bible')
 export class BibleController {
   constructor(private readonly bibleService: BibleService) {}
 
   @Get('/have-translations')
+  @ApiOperation({ summary: '서버에서 소유하고 있는 번역본 찾기' })
+  @ApiResponse({ status: 200, description: '번역본 갖고있는 리스트 반환' })
   async getAllTranslations() {
     const translations = await this.bibleService.findAllTranslation();
     return {
@@ -32,7 +35,16 @@ export class BibleController {
   }
 
   @Get('/chapters')
-  async getAllChapters(@Query() query: { translations?: Translation }) {
+  @ApiOperation({ summary: '모든 챕터 조회' })
+  @ApiResponse({ status: 200, description: '챕터별 장수 리스트 반환' })
+  @ApiProperty({ example: '새번역', description: '번역본 이름' })
+  async getAllChapters(
+    @Query()
+    query: {
+      translations?: Translation;
+    },
+  ) {
+    console.log(query);
     const chapters = await this.bibleService.findAllChapters(
       query.translations,
     );
@@ -60,5 +72,12 @@ export class BibleController {
   async create(@UploadedFile() file: Express.Multer.File) {
     const zz = await this.bibleService.createChapter(file);
     return zz;
+  }
+
+  @Get('/verses/for-word')
+  async getForWord(@Query() query: { word: string }) {
+    console.log(query.word);
+    const result = await this.bibleService.findVerseForWord(query.word);
+    return result;
   }
 }

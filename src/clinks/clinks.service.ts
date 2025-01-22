@@ -1,26 +1,37 @@
 import { Injectable } from '@nestjs/common';
 import { CreateClinkDto } from './dto/create-clink.dto';
 import { UpdateClinkDto } from './dto/update-clink.dto';
+import { InjectModel } from '@nestjs/mongoose';
+import { Clink } from './entities/clink.entity';
+import mongoose, { Model } from 'mongoose';
 
 @Injectable()
 export class ClinksService {
-  create(createClinkDto: CreateClinkDto) {
-    return 'This action adds a new clink';
+  constructor(
+    @InjectModel(Clink.name)
+    private clinkModel: Model<Clink>,
+  ) {}
+  async create(
+    userId: string,
+    bibleList: string[],
+    filePath: string[],
+    content: string,
+  ) {
+    const input = {
+      userId: new mongoose.Types.ObjectId(userId),
+      bibleList,
+      filePath,
+      content,
+    };
+    await this.clinkModel.create(input);
   }
 
-  findAll() {
-    return `This action returns all clinks`;
+  async findAllClinks() {
+    const result = await this.clinkModel.find({}).populate('userState').exec();
+    return result;
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} clink`;
-  }
-
-  update(id: number, updateClinkDto: UpdateClinkDto) {
-    return `This action updates a #${id} clink`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} clink`;
+  async update(updateData: Partial<Clink>) {
+    return;
   }
 }

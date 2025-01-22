@@ -45,7 +45,7 @@ export class BibleService {
         translation: translation == null ? '새번역' : translation,
       });
       const bookMap = new Map<string, ChapterDocument[]>();
-
+      console.log(bookMap.has('창세기'));
       chapters.forEach((chapter) => {
         if (bookMap.has(chapter.name)) {
           bookMap.get(chapter.name).push(chapter);
@@ -68,6 +68,7 @@ export class BibleService {
       const verses = await this.verseModel.find({
         chapterId: new mongoose.Types.ObjectId(chapterId),
       });
+
       return verses;
     } catch (err) {}
   }
@@ -97,6 +98,7 @@ export class BibleService {
         ...data.chapters[i],
         translationCode,
         chapter: data.chapters[i].chapter,
+        isOldTestament: data.chapters[i].isOldGospel,
       };
 
       const newChapter = await this.chapterModel.create(chapterModel);
@@ -150,5 +152,43 @@ export class BibleService {
       // );
     }
     return true;
+  }
+
+  async findVerseForWord(searchWord: string) {
+    // 1. 입력 문자열 전처리
+    const trimmedSearchTerm = searchWord.trim();
+
+    // 2. MongoDB 쿼리 실행
+    const results = await this.verseModel.find(
+      { content: { $regex: trimmedSearchTerm, $options: 'i' } }, // content 필드에서 검색
+      { chapterId: 1, content: 1 }, // chapterId와 content를 반환, _id는 기본적으로 포함됨
+    );
+
+    // 3. 앞뒤 어절 추출
+    const result = results
+      .map((doc) => {
+        const regex = new RegExp(
+          `(\\S*\\s)?(${trimmedSearchTerm})(\\s\\S*)?`,
+          'i',
+        );
+        const match = doc.content.match(regex);
+
+        if (match) {
+          const before = match[1] || ''; // 앞 어절 (없으면 빈 문자열)
+          const after = match[3] || ''; // 뒤 어절 (없으면 빈 문자열)
+          return {
+            _id: doc._id,
+            chapterId: doc.chapterId,
+            content: `${before}${match[2]}${after}`
+              .trim()
+              .replace(/^[\\"]+|[\\"]+$/g, ''),
+          }; // 결과 조합 및 공백 제거
+        }
+
+        return null;
+      })
+      .filter((item) => item !== null); // null 값 제거
+    console.log(result.length);
+    return result;
   }
 }

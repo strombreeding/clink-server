@@ -16,7 +16,8 @@ export class Chapter {
   translationCode: TranslationCode; // 새번역
 
   @Prop()
-  isOldGospel: boolean; // 구약 true
+  isOldTestament: boolean; // 구약 true
+  // isOldGospel: boolean; // 구약 true
 
   @Prop({ type: Types.ObjectId })
   prevChapter: ObjectId | null | string; // 이전 장에 chapter id

@@ -6,20 +6,29 @@ export type UserDocument = HydratedDocument<User>;
 
 @Schema()
 export class User {
-  @Prop({ require: true, unique: true })
+  @Prop({ require: true })
   name: string;
+
+  @Prop({ require: true })
+  nickname: string;
 
   @Prop()
   age: number;
 
   @Prop()
-  type: UserTypeEnum;
+  type: string;
 
   @Prop()
   info: string;
 
   @Prop()
   profileImg: string;
+
+  @Prop({ default: new Date() })
+  createdAt: Date;
+
+  @Prop({ default: null })
+  deletedAt: Date | null;
 
   //   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Owner' })
   //   owner: Owner;
