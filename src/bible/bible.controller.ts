@@ -2,10 +2,6 @@ import {
   Controller,
   Get,
   Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
   Query,
   UseInterceptors,
   UploadedFile,
@@ -14,9 +10,10 @@ import {
 import { BibleService } from './bible.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Translation } from '../../types/enum';
-import { query } from 'express';
-import { ObjectId } from 'mongoose';
 import { ApiOperation, ApiProperty, ApiResponse } from '@nestjs/swagger';
+import { TranslationsResponseDto } from './dto/translation.dto';
+import { ChaptersResponseDto } from './dto/chapter.dto';
+import { VersesResponseDto } from './dto/verse.dto';
 
 @Controller('bible')
 export class BibleController {
@@ -24,8 +21,12 @@ export class BibleController {
 
   @Get('/have-translations')
   @ApiOperation({ summary: '서버에서 소유하고 있는 번역본 찾기' })
-  @ApiResponse({ status: 200, description: '번역본 갖고있는 리스트 반환' })
-  async getAllTranslations() {
+  @ApiResponse({
+    status: 200,
+    description: '번역본 갖고있는 리스트 반환',
+    type: TranslationsResponseDto,
+  })
+  async getAllTranslations(): Promise<TranslationsResponseDto> {
     const translations = await this.bibleService.findAllTranslation();
     return {
       msg: '서버가 소유한 번역본 리스트 조회',
@@ -36,27 +37,37 @@ export class BibleController {
 
   @Get('/chapters')
   @ApiOperation({ summary: '모든 챕터 조회' })
-  @ApiResponse({ status: 200, description: '챕터별 장수 리스트 반환' })
+  @ApiResponse({
+    status: 200,
+    description: '챕터별 장수 리스트 반환',
+    type: ChaptersResponseDto,
+  })
   @ApiProperty({ example: '새번역', description: '번역본 이름' })
   async getAllChapters(
     @Query()
     query: {
       translations?: Translation;
     },
-  ) {
-    console.log(query);
+  ): Promise<ChaptersResponseDto> {
     const chapters = await this.bibleService.findAllChapters(
       query.translations,
     );
     return {
-      msg: '챕터 조회 ',
+      msg: '챕터 조회',
       data: chapters,
       status: HttpStatus.OK,
     };
   }
 
   @Get('/verses')
-  async getVersesFromChapter(@Query() query: { chapterId: string }) {
+  @ApiResponse({
+    status: 200,
+    description: '절 조회 결과 반환',
+    type: VersesResponseDto,
+  })
+  async getVersesFromChapter(
+    @Query() query: { chapterId: string },
+  ): Promise<VersesResponseDto> {
     const verses = await this.bibleService.findVersesFromChapterId(
       query.chapterId,
     );

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Chapter, ChapterDocument } from './entities/chapter.entity';
-import mongoose, { Model, ObjectId, Types } from 'mongoose';
+import mongoose, { Model, ObjectId } from 'mongoose';
 import { Translation, TranslationCode } from '../../types/enum';
 import { Verse } from './entities/verse.entity';
 import { Translations } from './entities/translations';

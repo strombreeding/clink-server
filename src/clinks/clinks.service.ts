@@ -1,6 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { CreateClinkDto } from './dto/create-clink.dto';
-import { UpdateClinkDto } from './dto/update-clink.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { Clink } from './entities/clink.entity';
 import mongoose, { Model } from 'mongoose';
@@ -29,9 +27,5 @@ export class ClinksService {
   async findAllClinks() {
     const result = await this.clinkModel.find({}).populate('userState').exec();
     return result;
-  }
-
-  async update(updateData: Partial<Clink>) {
-    return;
   }
 }
