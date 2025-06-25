@@ -14,9 +14,13 @@ import { LikesModule } from './likes/likes.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { MagazinesModule } from './magazines/magazines.module';
 import { InputBibleModule } from './input-bible/input-bible.module';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+    }),
     MongooseModule.forRoot('mongodb://localhost:27017/click'),
     BannersModule,
     UsersModule,

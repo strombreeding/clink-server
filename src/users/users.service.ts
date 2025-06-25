@@ -1,68 +1,81 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
 import { User, UserDocument } from './entities/user.entity';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
+import axios from 'axios';
 
 @Injectable()
 export class UsersService {
-  constructor(@InjectModel(User.name) private userModel: Model<User>) {}
+  constructor(
+    @InjectModel(User.name) private userModel: Model<User>,
+    private jwtService: JwtService,
+    private configService: ConfigService,
+  ) {}
+
+  async getKakaoAccessToken(code: string): Promise<any> {
+    try {
+      const response = await axios.post(
+        'https://kauth.kakao.com/oauth/token',
+        {
+          grant_type: 'authorization_code',
+          client_id: this.configService.get('KAKAO_DEVELOPER_REST'),
+          client_secret: this.configService.get('KAKAO_DEVELOPER_SECRET'),
+          redirect_uri: 'http://localhost:8080/kakao-test-callback',
+          code,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${code}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+        },
+      );
+      console.log(response.data, '캬캬2');
+      return response.data.access_token;
+    } catch (error) {
+      console.error(
+        'Failed to get Kakao user info:',
+        error.response?.data || error.message,
+      );
+      throw new UnauthorizedException(
+        'Invalid Kakao Access Token or API error.',
+      );
+    }
+  }
+
+  // 카카오 access_token으로 사용자 정보 가져오기
+  async getKakaoUserInfo(accessToken: string): Promise<any> {
+    try {
+      const response = await axios.get('https://kapi.kakao.com/v2/user/me', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error(
+        'Failed to get Kakao user info:',
+        error.response?.data || error.message,
+      );
+      throw new UnauthorizedException(
+        'Invalid Kakao Access Token or API error.',
+      );
+    }
+  }
+
+  // 사용자 정보 검증 및 저장 (또는 업데이트)
+  async validateKakaoUser(kakaoUserInfo: any): Promise<any> {
+    const kakaoId = kakaoUserInfo.id.toString();
+    return kakaoId;
+  }
 
   create(createUserDto: CreateUserDto) {
     console.log(createUserDto);
     return 'This action adds a new user';
-  }
-  async createAdmin() {
-    const datas: User[] = [
-      {
-        name: '이진희',
-        nickname: '지니나무',
-        age: 29,
-        type: 'admin',
-        info: '안녕하세요 나는 지니나무입니다',
-        createdAt: new Date(),
-        deletedAt: null,
-        profileImg:
-          'https://i.pinimg.com/236x/28/ca/1a/28ca1ae3996729d8eedec9235eb8d9a0.jpg',
-      },
-      {
-        name: '이진희',
-        nickname: '진둥이',
-        age: 29,
-        type: 'admin',
-        info: '멍멍멍!',
-        createdAt: new Date(),
-        deletedAt: null,
-        profileImg:
-          'https://i.namu.wiki/i/wiP-b4EAaFe8dcrYKxfRSBSBzqOVI_CMPyTPj5UdQpKQyvM_Q3tamuTnofFGNGoaeMBYyn_cUoI2dXqX3jxlkg.webp',
-      },
-      {
-        name: '송지은',
-        nickname: '송피',
-        age: 31,
-        type: 'admin',
-        info: '안녕하세요 나는 엘바페 팬이에요',
-        createdAt: new Date(),
-        deletedAt: null,
-        profileImg:
-          'https://cdn.slist.kr/news/photo/202410/591767_931973_102.jpg',
-      },
-      {
-        name: '노승현',
-        nickname: '마누라빼고다바꿔',
-        age: 32,
-        type: 'admin',
-        info: '안녕하세요 나는 배틀바이블 1등 노갈입니다',
-        createdAt: new Date(),
-        deletedAt: null,
-        profileImg:
-          'https://i.ytimg.com/vi/62eoTsRPJwA/sddefault.jpg?v=6524dbc6',
-      },
-    ];
-    for (let i = 0; i < datas.length; i++) {
-      await this.userModel.create(datas[i]);
-    }
   }
 
   async findAll() {
@@ -74,23 +87,69 @@ export class UsersService {
   }
 
   async findByIdAndUpdate(id: string, filter: Partial<User>) {
-    await this.userModel.findByIdAndUpdate(id, { $set: filter });
+    const updates = {
+      ...(filter.nickname && {
+        nickname: filter.nickname,
+        lastNicknameUpdateAt: new Date(),
+      }), // 닉네임 바꾸면 라스트 닉넴업데이트 해주기
+      ...(filter.info && { info: filter.info }),
+      ...(filter.type && { info: filter.type }),
+      ...(filter.profileImg && { profileImg: filter.profileImg }),
+      ...(filter.survey && { survey: new Date() }),
+      updatedAt: new Date(),
+    };
+
+    console.log(id, updates, '업데이트 할것들');
+    await this.userModel.findByIdAndUpdate(id, {
+      $set: {
+        ...updates,
+      },
+    });
     return true;
   }
 
-  async findOne(id: string) {
+  async findOneById(id: string) {
     const user = await this.userModel.findById(id);
     console.log(user);
     return user;
   }
 
-  update(id: number, updateUserDto: UpdateUserDto) {
-    return `This action updates a #${id} user`;
+  async findOneByKakaoId(socialId: string) {
+    const user = await this.userModel.findOne({ kakaoId: socialId });
+    console.log(user);
+    return user;
+  }
+
+  async createUser(user: Partial<User>) {
+    const newUser = await this.userModel.create(user);
+    return newUser;
+  }
+
+  // 우리 서비스의 JWT 토큰 발행
+  async generateJwtToken(user: UserDocument): Promise<{ accessToken: string }> {
+    const payload = {
+      // sub: user._id,
+      _id: user._id,
+      nickname: user.nickname,
+      profileImg: user.profileImg,
+      phone: user.phone,
+      email: user.email,
+      gender: user.gender,
+      birth: user.birth,
+      type: user.type,
+      info: user.info,
+      survey: user.survey,
+    };
+    return {
+      accessToken: this.jwtService.sign(payload, {
+        secret: this.configService.get('JWT_SECRET'),
+      }),
+    };
   }
 
   async remove(id: string) {
     console.log(id);
-    const zz = await this.userModel.findByIdAndUpdate(id, {
+    await this.userModel.findByIdAndUpdate(id, {
       $set: { deletedAt: new Date(new Date().getTime() + 604800000) },
     });
     return `This action removes a #${id} user`;
