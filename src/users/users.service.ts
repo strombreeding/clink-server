@@ -1,5 +1,4 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { CreateUserDto } from './dto/create-user.dto';
 import { User, UserDocument } from './entities/user.entity';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -73,11 +72,6 @@ export class UsersService {
     return kakaoId;
   }
 
-  create(createUserDto: CreateUserDto) {
-    console.log(createUserDto);
-    return 'This action adds a new user';
-  }
-
   async findAll() {
     return await this.userModel.find({});
   }
@@ -87,25 +81,64 @@ export class UsersService {
   }
 
   async findByIdAndUpdate(id: string, filter: Partial<User>) {
-    const updates = {
-      ...(filter.nickname && {
-        nickname: filter.nickname,
-        lastNicknameUpdateAt: new Date(),
-      }), // 닉네임 바꾸면 라스트 닉넴업데이트 해주기
-      ...(filter.info && { info: filter.info }),
-      ...(filter.type && { info: filter.type }),
-      ...(filter.profileImg && { profileImg: filter.profileImg }),
-      ...(filter.survey && { survey: new Date() }),
-      updatedAt: new Date(),
-    };
+    console.log(filter, '업데이트 할것들');
+
+    // 업데이트할 필드들을 동적으로 구성
+    const updates: any = {};
+
+    console.log(filter.survey, '닉네임');
+    // 각 필드가 존재할 때만 업데이트 객체에 추가
+    if (filter.nickname) {
+      updates.nickname = filter.nickname;
+      updates.lastNicknameUpdateAt = new Date(); // 닉네임 변경 시 마지막 업데이트 시간 기록
+    }
+
+    if (filter.info !== undefined) {
+      // undefined가 아닌 모든 값 허용 (빈 문자열도)
+      updates.info = filter.info;
+    }
+
+    if (filter.type !== undefined) {
+      updates.type = filter.type; // 기존 코드에서 info로 잘못 설정된 부분 수정
+    }
+
+    if (filter.profileImg !== undefined) {
+      updates.profileImg = filter.profileImg;
+    }
+
+    if (filter.survey !== undefined) {
+      updates.survey = new Date(); // survey 필드가 전달되면 현재 시간으로 설정
+    }
+
+    if (filter.fcmAllow !== undefined) {
+      updates.fcmAllow = filter.fcmAllow;
+    }
+
+    if (filter.fcmToken !== undefined) {
+      updates.fcmToken = filter.fcmToken;
+    }
+
+    // updatedAt은 항상 업데이트
+    updates.updatedAt = new Date();
 
     console.log(id, updates, '업데이트 할것들');
-    await this.userModel.findByIdAndUpdate(id, {
-      $set: {
-        ...updates,
+
+    // MongoDB 업데이트 실행
+    const result = await this.userModel.findByIdAndUpdate(
+      id,
+      { $set: updates },
+      {
+        new: true, // 업데이트된 문서 반환
+        runValidators: true, // 스키마 검증 실행
+        upsert: false, // 문서가 없으면 생성하지 않음
       },
-    });
-    return true;
+    );
+
+    if (!result) {
+      throw new Error(`사용자를 찾을 수 없습니다: ${id}`);
+    }
+
+    return result; // 업데이트된 사용자 정보 반환
   }
 
   async findOneById(id: string) {
@@ -126,7 +159,7 @@ export class UsersService {
   }
 
   // 우리 서비스의 JWT 토큰 발행
-  async generateJwtToken(user: UserDocument): Promise<{ accessToken: string }> {
+  async generateJwtToken(user: UserDocument): Promise<string> {
     const payload = {
       // sub: user._id,
       _id: user._id,
@@ -140,11 +173,9 @@ export class UsersService {
       info: user.info,
       survey: user.survey,
     };
-    return {
-      accessToken: this.jwtService.sign(payload, {
-        secret: this.configService.get('JWT_SECRET'),
-      }),
-    };
+    return this.jwtService.sign(payload, {
+      secret: this.configService.get('JWT_SECRET'),
+    });
   }
 
   async remove(id: string) {

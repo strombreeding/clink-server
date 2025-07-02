@@ -32,6 +32,12 @@ export class User {
   @Prop({ require: false, default: '' })
   info: string;
 
+  @Prop({ require: false, default: false })
+  fcmAllow: boolean;
+
+  @Prop({ require: false, default: '' })
+  fcmToken: string;
+
   @Prop({ default: new Date() })
   survey: Date;
 

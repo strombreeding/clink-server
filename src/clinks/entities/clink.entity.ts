@@ -1,45 +1,22 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, Types } from 'mongoose';
-import { User } from '../../users/entities/user.entity';
-import { ApiProperty } from '@nestjs/swagger';
+import { HydratedDocument } from 'mongoose';
 
 export type ClinkDocument = HydratedDocument<Clink>;
 
-@Schema()
+@Schema({ timestamps: true })
 export class Clink {
-  @ApiProperty({
-    description: '사용자 정보',
-  })
-  @Prop({ type: Types.ObjectId, ref: 'User' })
-  userState: User; // 창세기
+  @Prop({ require: true })
+  ownerId: string;
 
-  @ApiProperty({
-    description: '클링 내용',
-    example: '오늘의 묵상 내용입니다.',
-    type: String,
-  })
-  @Prop()
+  @Prop({ require: true, maxlength: 500 })
   content: string; // 새번역
 
-  @ApiProperty({
-    description: '파일 경로 목록',
-    example: ['/uploads/123e4567-e89b-12d3-a456-426614174000.jpg'],
-    type: [String],
-  })
   @Prop()
-  filePath: string[];
+  filePath: string[]; // max Length 5
 
-  @ApiProperty({
-    description: '생성 일시',
-    type: Date,
-  })
   @Prop({ default: new Date() })
   createdAt: Date;
 
-  @ApiProperty({
-    description: '수정 일시',
-    type: Date,
-  })
   @Prop({ default: new Date() })
   updatedAt: Date;
 }

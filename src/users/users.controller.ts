@@ -12,13 +12,14 @@ import {
   Req,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
-import { CreateUserDto } from './dto/create-user.dto';
 import { User } from './entities/user.entity';
 import { JwtAuthGuard, RequestWithUserId } from '../JwtAuthGuard';
 
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
+
+  // - 1. 카카오 로그인
   @Post('kakao-login')
   async kakaoLogin(@Body('accessToken') kakaoAccessToken: string) {
     try {
@@ -37,14 +38,14 @@ export class UsersController {
       if (user == null) {
         const newUser = await this.usersService.createUser({
           kakaoId: id,
-          email: email,
-          profileImg: thumbnail_image_url,
+          email: email || null,
+          profileImg: thumbnail_image_url || null,
         });
-        const jwtToken = await this.usersService.generateJwtToken(newUser);
+        const accessToken = await this.usersService.generateJwtToken(newUser);
         return {
+          code: HttpStatus.CREATED,
           msg: '카카오 회원가입 완료',
-          accessToken: jwtToken,
-          newUser,
+          data: { accessToken, user: newUser },
         };
       }
 
@@ -53,6 +54,7 @@ export class UsersController {
 
       // 프론트엔드(React Native 앱)로 우리 서비스의 JWT 토큰 반환
       return {
+        code: HttpStatus.OK,
         msg: '카카오 로그인 완료',
         accessToken: jwtToken,
       };
@@ -60,20 +62,32 @@ export class UsersController {
       console.error('Kakao login failed:', error);
       if (error instanceof UnauthorizedException) {
         return {
-          status: HttpStatus.UNAUTHORIZED,
+          code: HttpStatus.UNAUTHORIZED,
           msg: error.message,
+          data: null,
         };
       }
       return {
-        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        code: HttpStatus.INTERNAL_SERVER_ERROR,
         msg: 'Internal server error during Kakao login.',
+        data: null,
       };
     }
   }
 
-  @Post()
-  create(@Body() createUserDto: CreateUserDto) {
-    return this.usersService.create(createUserDto);
+  // - 2. 유저 정보 변경
+  @UseGuards(JwtAuthGuard)
+  @Patch()
+  async userUpdate(@Req() req: RequestWithUserId, @Body() body: Partial<User>) {
+    // console.log(req, '여기로?');
+    await this.usersService.findByIdAndUpdate(req.userId, body);
+    return {
+      code: HttpStatus.OK,
+      msg: '유저 정보 변경 완료',
+      data: {
+        result: true,
+      },
+    };
   }
 
   @Get()
@@ -84,17 +98,6 @@ export class UsersController {
   @Get('/filter')
   async findByFilter(@Query() query: Partial<User>) {
     return await this.usersService.findByFilter(query);
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Patch()
-  async userUpdate(@Req() req: RequestWithUserId, @Body() body: Partial<User>) {
-    // console.log(req, '여기로?');
-    await this.usersService.findByIdAndUpdate(req.userId, body);
-    return {
-      msg: '유저 정보 변경 완료',
-      result: true,
-    };
   }
 
   @Get(':id')
