@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Chapter, ChapterDocument } from './entities/chapter.entity';
-import mongoose, { Model, ObjectId } from 'mongoose';
+import mongoose, { Model, ObjectId, Types } from 'mongoose';
 import { Translation, TranslationCode } from '../../types/enum';
 import { Verse } from './entities/verse.entity';
 import { Translations } from './entities/translations';
+import { ISearchWordRes } from 'types';
 
 interface IChapterProps {
   name: string;
@@ -75,12 +76,16 @@ export class BibleService {
 
   async createChapter(file: Express.Multer.File) {
     const jsonContent = file.buffer.toString();
+
     const data: { chapters: IChapterProps[]; verses: IVerseProps[] } =
       JSON.parse(jsonContent);
+
+    console.log(JSON.parse(jsonContent));
 
     const existBible = await this.chapterModel.findOne({
       translation: data.chapters[0].translation,
     });
+    console.log('ㅂㅇ');
     if (existBible) {
       return `이미 존재하는 번역본 입니다.[${data.chapters[0].translation}]`;
     }
@@ -143,34 +148,143 @@ export class BibleService {
         );
       }
 
-      // await this.chapterModel.findOne({customId:})
-      // mongoData.nextChapter = jsonData.nextChapter;
-      // mongoData.prevChapter = jsonData.prevChapter;
-      // await this.chapterModel.findOneAndUpdate(
-      //   { _id: mongoData._id },
-      //   { $set: { prevChapter: } },
       // );
     }
     return true;
   }
 
-  async findVerseForWord(searchWord: string) {
+  async findVerseForWord(
+    searchWord: string,
+    lastId?: string,
+    useLegacyLogic: boolean = false, // true: 기존 $regex 로직, false: 개선된 $text 로직
+    pageSize: number = 25,
+  ): Promise<ISearchWordRes> {
     // 1. 입력 문자열 전처리
     const trimmedSearchTerm = searchWord.trim();
 
-    // 2. MongoDB 쿼리 실행
-    const results = await this.verseModel.find(
-      { content: { $regex: trimmedSearchTerm, $options: 'i' } }, // content 필드에서 검색
-      { chapterId: 1, content: 1 }, // chapterId와 content를 반환, _id는 기본적으로 포함됨
-    );
+    if (!trimmedSearchTerm) {
+      console.log('검색어가 유효하지 않습니다.');
+      return { verses: [], hasNextPage: false, lastId: null };
+    }
 
-    // 3. 앞뒤 어절 추출
-    const result = results
+    const pipeline: any[] = [];
+
+    // --- 검색어 매칭 및 초기 필터링 로직 (여기서 분기) ---
+    if (useLegacyLogic) {
+      // **기존 $regex 로직 (손상 없이 유지)**
+      pipeline.push({
+        $match: {
+          content: { $regex: trimmedSearchTerm, $options: 'i' },
+        },
+      });
+
+      // 기존 _id 기반 커서 페이지네이션 조건
+      if (lastId) {
+        pipeline.push({
+          $match: {
+            _id: { $gt: new Types.ObjectId(lastId) },
+          },
+        });
+      }
+
+      // 기존 _id 기준 정렬
+      pipeline.push({
+        $sort: { _id: 1 },
+      });
+
+      pipeline.push({
+        $project: {
+          _id: 1,
+          chapterId: 1,
+          index: 1,
+          content: 1,
+        },
+      });
+    } else {
+      pipeline.push({
+        $match: {
+          $text: { $search: trimmedSearchTerm },
+        },
+      });
+
+      if (lastId) {
+        pipeline.push({
+          $match: {
+            _id: { $gt: new Types.ObjectId(lastId) },
+          },
+        });
+      }
+
+      pipeline.push({
+        $sort: { _id: 1 },
+      });
+
+      pipeline.push({
+        $project: {
+          _id: 1,
+          chapterId: 1, // $lookup 전에도 chapterId는 있어야 합니다.
+          index: 1, // $lookup 전에도 index는 있어야 합니다.
+          content: 1, // $lookup 전에도 content는 있어야 합니다.
+        },
+      });
+    }
+
+    // --- 검색어 매칭 및 초기 필터링 로직 끝 ---
+    // 2. Chapter 컬렉션과 조인 ($lookup) - 로직 변화 없음
+    pipeline.push({
+      $lookup: {
+        from: 'chapters',
+        localField: 'chapterId',
+        foreignField: '_id',
+        as: 'chapterInfo',
+      },
+    });
+
+    // 3. 조인된 배열을 단일 객체로 펼치기 ($unwind) - 로직 변화 없음
+    pipeline.push({
+      $unwind: {
+        path: '$chapterInfo',
+        preserveNullAndEmptyArrays: true,
+      },
+    });
+
+    // 4. 최종 결과 필드 선택 및 이름 변경 ($project) -
+    pipeline.push({
+      $project: {
+        _id: '$_id',
+        chapterId: '$chapterId',
+        index: '$index',
+        content: '$content', // 원본 content는 여기서 가져옵니다.
+        chapterName: '$chapterInfo.name',
+        chapterIndex: '$chapterInfo.chapter',
+      },
+    });
+
+    // 5. 결과 개수 제한 (한 페이지 + 다음 페이지 존재 여부 확인을 위해 1개 더 가져옴) - 로직 변화 없음
+    pipeline.push({
+      $limit: pageSize + 1,
+    });
+
+    const rawResults = await this.verseModel.aggregate(pipeline);
+    console.log(rawResults[rawResults.length - 1]._id);
+
+    const hasNextPage = rawResults.length > pageSize;
+    const paginatedResults = rawResults.slice(0, pageSize);
+
+    // 6. 앞뒤 어절 추출 및 최종 가공 - 로직 변화 없음 (NULL 검사 포함)
+    const finalProcessedResults = paginatedResults
       .map((doc) => {
-        const regex = new RegExp(
-          `(\\S*\\s)?(${trimmedSearchTerm})(\\s\\S*)?`,
-          'i',
-        );
+        let regex;
+
+        if (useLegacyLogic) {
+          regex = new RegExp(
+            `(\\S*)(${trimmedSearchTerm})(\\S*)`, // 공백이 아닌 문자로 검색어 앞뒤를 모두 잡기
+            'i',
+          );
+        } else {
+          regex = new RegExp(`(\\S*\\s)?(${trimmedSearchTerm})(\\s\\S*)?`, 'i');
+        }
+
         const match = doc.content.match(regex);
 
         if (match) {
@@ -179,16 +293,41 @@ export class BibleService {
           return {
             _id: doc._id,
             chapterId: doc.chapterId,
+            index: doc.index,
+            chapterName: doc.chapterName,
+            chapterIndex: doc.chapterIndex,
+            fullContent: doc.content,
             content: `${before}${match[2]}${after}`
               .trim()
-              .replace(/^[\\"]+|[\\"]+$/g, ''),
+              .replace(/^[\\"]+|[\\"]+$/g, '')
+              .replace('”', '')
+              .replace('“', '')
+              .replace('’', '')
+              .replace('‘', ''),
           }; // 결과 조합 및 공백 제거
         }
 
         return null;
       })
       .filter((item) => item !== null); // null 값 제거
-    console.log(result.length);
-    return result;
+
+    console.log(finalProcessedResults.length);
+
+    const lastDoc =
+      finalProcessedResults.length > 0
+        ? finalProcessedResults[finalProcessedResults.length - 1]
+        : null;
+    const nextLastId = lastDoc ? lastDoc._id : null;
+
+    if (finalProcessedResults.length === 0 && useLegacyLogic === false) {
+      console.log('검색어결과가 없어서 기존 로직으로 다시 검색');
+      return await this.findVerseForWord(searchWord, lastId, true, pageSize);
+    }
+
+    return {
+      verses: finalProcessedResults,
+      hasNextPage: hasNextPage,
+      lastId: nextLastId,
+    };
   }
 }

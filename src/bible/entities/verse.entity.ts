@@ -26,3 +26,4 @@ export const VerseSchema = SchemaFactory.createForClass(Verse);
 
 // 텍스트 인덱스 설정
 VerseSchema.index({ content: 'text' });
+VerseSchema.index({ chapterId: 1 });
