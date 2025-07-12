@@ -28,9 +28,9 @@ export class ClinksController {
     // const bibleList = body.bible ? JSON.parse(JSON.stringify(body.bible)) : [];
     const userId = req.userId;
     const content = body.content;
-    const fileList = body.fileList;
+    const imgList = body.imgList;
 
-    const newClink = await this.clinksService.create(userId, content, fileList);
+    const newClink = await this.clinksService.create(userId, content, imgList);
 
     return {
       code: HttpStatus.CREATED,
@@ -38,6 +38,32 @@ export class ClinksController {
       data: {
         newClink,
       },
+    };
+  }
+
+  @Get('/')
+  async getClinkPaginationByCursor(
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+    @Query('adjustedScore') adjustedScore?: string,
+    @Query('createdAt') createdAt?: string,
+    @Query('_id') _id?: string,
+  ) {
+    let data = null;
+    if (adjustedScore && createdAt && _id) {
+      data = {
+        adjustedScore: parseFloat(adjustedScore),
+        createdAt,
+        _id,
+      };
+    }
+    const result = await this.clinksService.getClinkPaginationByCursor(
+      limit,
+      data,
+    );
+    return {
+      code: HttpStatus.OK,
+      msg: '크링크 조회',
+      data: result,
     };
   }
 
@@ -55,5 +81,10 @@ export class ClinksController {
   private async getFileSize(filePath: string): Promise<number> {
     const stats = fs.statSync(filePath);
     return stats.size;
+  }
+
+  @Post('/mock')
+  async createMockClinks() {
+    return await this.clinksService.createMockClinks();
   }
 }

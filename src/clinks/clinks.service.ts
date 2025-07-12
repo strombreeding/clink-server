@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Clink } from './entities/clink.entity';
-import mongoose, { Model } from 'mongoose';
+import mongoose, { Model, Types } from 'mongoose';
+import { getMockList } from 'data';
 
 @Injectable()
 export class ClinksService {
@@ -9,6 +10,231 @@ export class ClinksService {
     @InjectModel(Clink.name)
     private clinkModel: Model<Clink>,
   ) {}
+
+  async createMockClinks() {
+    const clinkData = getMockList();
+    for (let i = 0; i < clinkData.length; i++) {
+      await this.clinkModel.create(clinkData[i]);
+    }
+    return 'success';
+  }
+
+  // async getClinkPaginationByCursor(
+  //   limit = 20,
+  //   cursor?: {
+  //     adjustedScore: number;
+  //     createdAt: string;
+  //     _id: string;
+  //   },
+  // ) {
+  //   const today = new Date();
+  //   today.setHours(0, 0, 0, 0); // 오늘 00시 기준
+
+  //   const pipeline: any[] = [
+  //     {
+  //       $addFields: {
+  //         daysAgo: {
+  //           $floor: {
+  //             $divide: [
+  //               { $subtract: [today, '$createdAt'] },
+  //               1000 * 60 * 60 * 24,
+  //             ],
+  //           },
+  //         },
+  //       },
+  //     },
+  //     {
+  //       $addFields: {
+  //         adjustedScore: {
+  //           $cond: [
+  //             { $gt: ['$daysAgo', 7] },
+  //             { $multiply: ['$totalScore', 0.0001] }, // 7일 초과는 강한 페널티
+  //             {
+  //               $cond: [
+  //                 { $gt: ['$totalScore', 0] },
+  //                 '$totalScore', // 점수 있음 → 그대로 사용
+  //                 2, // 점수 없음 → 최소 1점 보정
+  //               ],
+  //             },
+  //           ],
+  //         },
+  //       },
+  //     },
+  //   ];
+
+  //   if (cursor) {
+  //     pipeline.push({
+  //       $match: {
+  //         $or: [
+  //           { adjustedScore: { $lt: cursor.adjustedScore } },
+  //           {
+  //             adjustedScore: cursor.adjustedScore,
+  //             createdAt: { $lt: new Date(cursor.createdAt) },
+  //           },
+  //           {
+  //             adjustedScore: cursor.adjustedScore,
+  //             createdAt: new Date(cursor.createdAt),
+  //             _id: { $lt: new Types.ObjectId(cursor._id) },
+  //           },
+  //         ],
+  //       },
+  //     });
+  //   }
+
+  //   pipeline.push(
+  //     {
+  //       $sort: {
+  //         adjustedScore: -1,
+  //         createdAt: -1,
+  //         _id: -1,
+  //       },
+  //     },
+  //     {
+  //       $limit: limit,
+  //     },
+  //   );
+
+  //   const clinks = await this.clinkModel.aggregate(pipeline);
+
+  //   const nextCursor =
+  //     clinks.length > 0
+  //       ? {
+  //           adjustedScore: clinks[clinks.length - 1].adjustedScore,
+  //           createdAt: clinks[clinks.length - 1].createdAt,
+  //           _id: clinks[clinks.length - 1]._id.toString(),
+  //         }
+  //       : null;
+
+  //   return {
+  //     data: clinks,
+  //     nextCursor,
+  //   };
+  // }
+
+  async getClinkPaginationByCursor(
+    limit = 20,
+    cursor?: {
+      adjustedScore: number;
+      createdAt: string;
+      _id: string;
+    },
+  ) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // 오늘 00시 기준
+
+    const pipeline: any[] = [
+      {
+        $addFields: {
+          daysAgo: {
+            $floor: {
+              $divide: [
+                { $subtract: [today, '$createdAt'] },
+                1000 * 60 * 60 * 24,
+              ],
+            },
+          },
+        },
+      },
+      {
+        $addFields: {
+          baseScore: {
+            $switch: {
+              branches: [
+                { case: { $lte: ['$daysAgo', 7] }, then: 5 },
+                { case: { $lte: ['$daysAgo', 31] }, then: 2.5 },
+                { case: { $lte: ['$daysAgo', 90] }, then: 1.5 },
+                { case: { $lte: ['$daysAgo', 365] }, then: 0.5 },
+                { case: { $lte: ['$daysAgo', 365 * 2] }, then: -0.5 },
+                { case: { $lte: ['$daysAgo', 365 * 3] }, then: -0.7 },
+                { case: { $lte: ['$daysAgo', 365 * 4] }, then: -1 },
+              ],
+              default: 0,
+            },
+          },
+        },
+      },
+      {
+        $addFields: {
+          adjustedScore: {
+            $cond: [
+              { $gt: ['$daysAgo', 7] },
+              { $add: [{ $multiply: ['$totalScore', 0.0001] }, '$baseScore'] },
+              { $add: ['$totalScore', '$baseScore'] },
+              // { $gt: ['$daysAgo', 7] },
+              // { $multiply: ['$totalScore', 0.0001] },
+              // { $add: ['$totalScore', '$baseScore'] }, // 7일 이하 → 점수 + 기본 점수
+            ],
+          },
+        },
+      },
+    ];
+
+    if (cursor) {
+      pipeline.push({
+        $match: {
+          $or: [
+            { adjustedScore: { $lt: cursor.adjustedScore } },
+            {
+              adjustedScore: cursor.adjustedScore,
+              createdAt: { $lt: new Date(cursor.createdAt) },
+            },
+            {
+              adjustedScore: cursor.adjustedScore,
+              createdAt: new Date(cursor.createdAt),
+              _id: { $lt: new Types.ObjectId(cursor._id) },
+            },
+          ],
+        },
+      });
+    }
+
+    pipeline.push(
+      // - sort, limit이전에 lookup 추가 (join같은것)
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'ownerId',
+          foreignField: '_id',
+          as: 'userDetail',
+        },
+      },
+      {
+        $lookup: {
+          from: 'verses', // verse 컬렉션명 (주의: 실제 컬렉션명 확인)
+          localField: 'verses',
+          foreignField: 'customId',
+          as: 'verseDetails',
+        },
+      },
+      {
+        $sort: {
+          adjustedScore: -1,
+          createdAt: -1,
+          _id: -1,
+        },
+      },
+      {
+        $limit: limit,
+      },
+    );
+
+    const clinks = await this.clinkModel.aggregate(pipeline);
+
+    const nextCursor =
+      clinks.length > 0
+        ? {
+            adjustedScore: clinks[clinks.length - 1].adjustedScore,
+            createdAt: clinks[clinks.length - 1].createdAt,
+            _id: clinks[clinks.length - 1]._id.toString(),
+          }
+        : null;
+
+    return {
+      clinks,
+      nextCursor,
+    };
+  }
+
   async create(userId: string, content: string, fileList: string[]) {
     const input = {
       ownerId: userId,

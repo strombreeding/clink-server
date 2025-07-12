@@ -33,3 +33,5 @@ export class Chapter {
 }
 
 export const ChapterSchema = SchemaFactory.createForClass(Chapter);
+
+ChapterSchema.index({ customId: 1 }, { unique: true });

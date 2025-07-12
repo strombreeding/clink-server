@@ -6,5 +6,8 @@ export class CreateClinkDto {
   content: string;
 
   @IsOptional()
-  fileList?: string[];
+  imgList?: string[];
+
+  @IsOptional()
+  verses?: string[];
 }

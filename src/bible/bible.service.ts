@@ -40,10 +40,20 @@ export class BibleService {
     } catch (err) {}
   }
 
-  async findAllChapters(translation?: Translation) {
+  async findAllChapters(
+    translation?: Translation,
+    customId?: string,
+    chapterId?: string,
+    name?: string,
+  ) {
     try {
       const chapters = await this.chapterModel.find({
-        translation: translation == null ? '새번역' : translation,
+        $or: [
+          { customId: customId },
+          { _id: new mongoose.Types.ObjectId(chapterId) },
+          { name: name },
+        ],
+        $and: [{ translation: translation == null ? '새한글' : translation }],
       });
       const bookMap = new Map<string, ChapterDocument[]>();
       console.log(bookMap.has('창세기'));
@@ -64,10 +74,20 @@ export class BibleService {
     } catch (err) {}
   }
 
-  async findVersesFromChapterId(chapterId: string) {
+  async findVersesFromChapterId(
+    chapterId?: string,
+    customId?: string,
+    customChapterId?: string,
+    verseId?: string,
+  ) {
     try {
       const verses = await this.verseModel.find({
-        chapterId: new mongoose.Types.ObjectId(chapterId),
+        $or: [
+          { chapterId: new mongoose.Types.ObjectId(chapterId) },
+          { customId: customId },
+          { customChapterId: customChapterId },
+          { _id: new mongoose.Types.ObjectId(verseId) },
+        ],
       });
 
       return verses;
@@ -121,6 +141,8 @@ export class BibleService {
         const newVerse = {
           ...hasVerses[i],
           chapterId: _id,
+          customChapterId: customId,
+          customId: hasVerses[i].customId,
           postIdList: [],
         };
         await this.verseModel.create(newVerse);

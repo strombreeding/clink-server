@@ -10,13 +10,19 @@ export class Verse {
   chapterId: ObjectId | string;
 
   @Prop()
+  customChapterId: string;
+
+  @Prop()
+  customId: string;
+
+  @Prop()
   index: string;
 
   @Prop()
   content: string;
 
-  @Prop({ type: [Types.ObjectId] })
-  markedUsers: ObjectId[]; // 마크업한 유저의 수
+  @Prop()
+  markedUsers: number;
 
   @Prop({ type: [Types.ObjectId] })
   postIdList: ObjectId[] | string[];
@@ -27,3 +33,9 @@ export const VerseSchema = SchemaFactory.createForClass(Verse);
 // 텍스트 인덱스 설정
 VerseSchema.index({ content: 'text' });
 VerseSchema.index({ chapterId: 1 });
+
+// customChapterId로 자주 검색/정렬한다면
+VerseSchema.index({ customChapterId: 1 });
+
+// customId로 자주 검색/정렬하며, 고유해야 한다면
+VerseSchema.index({ customId: 1 }, { unique: true });
