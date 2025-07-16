@@ -1,7 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { User, UserDocument } from './entities/user.entity';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Document, Model, Types } from 'mongoose';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
@@ -139,6 +139,16 @@ export class UsersService {
     }
 
     return result; // 업데이트된 사용자 정보 반환
+  }
+
+  // 여러 유저 정보 조회
+  async findAllByIds(userIds: Types.ObjectId[]) {
+    return await this.userModel
+      .find({
+        _id: { $in: userIds },
+      })
+      .select('_id nickname profileImg')
+      .lean();
   }
 
   async findOneById(id: string) {

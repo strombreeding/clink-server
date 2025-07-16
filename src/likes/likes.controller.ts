@@ -1,34 +1,55 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Req,
+  HttpStatus,
+} from '@nestjs/common';
 import { LikesService } from './likes.service';
 import { CreateLikeDto } from './dto/create-like.dto';
-import { UpdateLikeDto } from './dto/update-like.dto';
+
+import { JwtAuthGuard, RequestWithUserId } from 'src/JwtAuthGuard';
 
 @Controller('likes')
 export class LikesController {
   constructor(private readonly likesService: LikesService) {}
 
-  @Post()
-  create(@Body() createLikeDto: CreateLikeDto) {
-    return this.likesService.create(createLikeDto);
+  @UseGuards(JwtAuthGuard)
+  @Post('/')
+  async reclinkLikeCreate(
+    @Req() req: RequestWithUserId,
+    @Body() createLikeDto: CreateLikeDto,
+  ) {
+    const result = await this.likesService.createLike({
+      ...createLikeDto,
+      ownerId: req.userId,
+    });
+    return {
+      code: HttpStatus.CREATED,
+      msg: '좋아요 누르기 완료',
+      data: result,
+    };
   }
 
-  @Get()
-  findAll() {
-    return this.likesService.findAll();
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.likesService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateLikeDto: UpdateLikeDto) {
-    return this.likesService.update(+id, updateLikeDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.likesService.remove(+id);
+  @UseGuards(JwtAuthGuard)
+  @Delete('/')
+  async clinkLikeDelete(
+    @Req() req: RequestWithUserId,
+    @Body() body: { type: 'clink' | 'reclink' | 'magazine'; id: string },
+  ) {
+    const result = await this.likesService.delete({
+      ...body,
+      ownerId: req.userId,
+    });
+    return {
+      code: HttpStatus.OK,
+      msg: '좋아요 취소 완료',
+      data: result,
+    };
   }
 }

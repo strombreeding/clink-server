@@ -2,8 +2,8 @@ import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 import mongoose from 'mongoose';
 
 export class CreateReClinkDto {
-  @IsNotEmpty()
-  ownerId: mongoose.Types.ObjectId;
+  @IsOptional()
+  reclink?: mongoose.Types.ObjectId;
 
   @IsNotEmpty()
   clinkId?: mongoose.Types.ObjectId;

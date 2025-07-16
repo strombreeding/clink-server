@@ -15,6 +15,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { MagazinesModule } from './magazines/magazines.module';
 
 import { ConfigModule } from '@nestjs/config';
+import { BookmarksModule } from './bookmarks/bookmarks.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { ConfigModule } from '@nestjs/config';
     NotificationsModule,
     MagazinesModule,
     BibleModule,
+    BookmarksModule,
   ],
   controllers: [AppController],
   providers: [AppService],

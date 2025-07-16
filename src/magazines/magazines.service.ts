@@ -1,26 +1,29 @@
 import { Injectable } from '@nestjs/common';
 import { CreateMagazineDto } from './dto/create-magazine.dto';
 import { UpdateMagazineDto } from './dto/update-magazine.dto';
+import { InjectModel } from '@nestjs/mongoose';
+import { Magazine } from './entities/magazine.entity';
+import { Model, Types } from 'mongoose';
 
 @Injectable()
 export class MagazinesService {
-  create(createMagazineDto: CreateMagazineDto) {
-    return 'This action adds a new magazine';
-  }
+  constructor(
+    @InjectModel(Magazine.name)
+    private magazineModel: Model<Magazine>,
+  ) {}
 
-  findAll() {
-    return `This action returns all magazines`;
+  async increaseLikeCount(id: string) {
+    await this.magazineModel.findOneAndUpdate(
+      { _id: new Types.ObjectId(id) },
+      { $inc: { likeCount: 1 } },
+      { new: true },
+    );
   }
-
-  findOne(id: number) {
-    return `This action returns a #${id} magazine`;
-  }
-
-  update(id: number, updateMagazineDto: UpdateMagazineDto) {
-    return `This action updates a #${id} magazine`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} magazine`;
+  async decreaseLikeCount(id: string) {
+    await this.magazineModel.findOneAndUpdate(
+      { _id: new Types.ObjectId(id) },
+      { $inc: { likeCount: -1 } },
+      { new: true },
+    );
   }
 }

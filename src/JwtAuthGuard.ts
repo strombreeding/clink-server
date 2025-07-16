@@ -33,7 +33,7 @@ export class JwtAuthGuard implements CanActivate {
       const payload = this.jwtService.verify(token, {
         secret: this.configService.get('JWT_SECRET'),
       });
-      console.log(payload, '페이로드');
+      console.log(payload._id, '유저 Id');
 
       //- payload에서 _id 값을 추출해서 request에 저장
       request['userId'] = payload._id;

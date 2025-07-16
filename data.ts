@@ -14,13 +14,27 @@ export const getMockList = () => {
       date.setDate(date.getDate() - dateCnt); //- 날짜를 하루씩 감소 25.7.12 에서 -dateCnt만큼 감소
     }
 
-    let totalScore = Math.floor(index * 2) + index;
+    let totalScore = (Math.floor(index * 2) + index) * 0.01;
+
+    const imgCnt = Math.floor(Math.random() * 4);
+    const imgList = [];
+    for (let i = 0; i < imgCnt; i++) {
+      imgList.push(
+        `https://fastly.picsum.photos/id/410/200/300.jpg?hmac=c8g8PTUISEdRZEqZGLtB3eOCOq7t5A5rJY1vU8dp_Ds`,
+      );
+    }
+
+    const verseCnt = Math.floor(Math.random() * 4);
+    const verseList = [];
+    for (let i = 0; i < verseCnt; i++) {
+      verseList.push(`SAEHAN-GEN-1@:${i + 1}`);
+    }
 
     return {
       ownerId: new mongoose.Types.ObjectId('68721fa9026516a6875e05f7'),
-      content: '1',
-      imgList: [],
-      verses: ['SAEHAN-GEN-1@:1', 'SAEHAN-GEN-1@:2', 'SAEHAN-GEN-1@:3'],
+      content: `${index} 입니다.`,
+      imgList,
+      verses: verseList,
       likeCount: index,
       commentCount: index,
       createdAt: date,
